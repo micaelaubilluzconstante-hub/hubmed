@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="HUB MED — Accesorios e insumos médicos universitarios. Be the vibe. Wear your world.">
+<meta property="og:title" content="HUB MED">
+<meta property="og:description" content="Accesorios e insumos para la comunidad médica universitaria.">
+<meta property="og:type" content="website">
+<title>HUB MED — Accesorios & Insumos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-circle-1"></div>
+  <div class="hero-circle-2"></div>
+  <div class="hero-inner">
+    <div class="hero-tag">✦ Accesorios &nbsp;·&nbsp; Insumos &nbsp;·&nbsp; Tu estilo</div>
+    <h1 class="hero-title">HUB<em>MED</em></h1>
+    <p class="hero-sub">Be the vibe. Wear your world.</p>
+    <div class="hero-line"></div>
+  </div>
+</header>
+
+<!-- FILTER BAR -->
+<nav class="filter-bar" aria-label="Filtrar por categoría">
+  <button class="fbtn active" data-cat="all">Todo</button>
+  <button class="fbtn" data-cat="accesorios">Accesorios</button>
+  <button class="fbtn" data-cat="gorros">Gorros</button>
+  <button class="fbtn" data-cat="joyeria">Joyería</button>
+  <button class="fbtn" data-cat="insumos">Insumos</button>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- CART BAR -->
+  <div class="cart-bar" role="region" aria-label="Carrito de compras">
+    <div class="cart-left">
+      <div class="cart-icon-wrap"><i class="ti ti-shopping-bag" aria-hidden="true"></i></div>
+      <div>
+        <div class="cart-label">Mi carrito</div>
+        <div class="cart-count" id="cc-lbl">0 productos</div>
+      </div>
+    </div>
+    <div class="cart-right">
+      <div class="cart-total" id="ct-disp">$0.00</div>
+      <button class="cbtn" id="co-btn" disabled onclick="openCheckout()">Pedir →</button>
+    </div>
+  </div>
+
+  <!-- SECTION HEADER -->
+  <div class="sec-hdr">
+    <div>
+      <h2 class="sec-title" id="sec-title">Todos los productos</h2>
+      <p class="sec-cnt" id="sec-cnt"></p>
+    </div>
+    <button class="add-new-btn" onclick="openAddModal()" aria-label="Agregar nuevo producto">
+      <i class="ti ti-plus" aria-hidden="true"></i> Agregar producto
+    </button>
+  </div>
+
+  <!-- PRODUCT GRID -->
+  <div class="pgrid" id="pgrid" role="list"></div>
+
+</main>
+
+<!-- ==================== ADD / EDIT MODAL ==================== -->
+<div class="moverlay" id="add-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
+  <div class="modal">
+    <div class="modal-title" id="modal-title-text">✦ Agregar producto</div>
+    <input type="hidden" id="edit-id">
+
+    <div class="fgrp">
+      <label class="flbl" for="p-name">Nombre del producto</label>
+      <input class="finput" id="p-name" placeholder="ej. Gorro quirúrgico floral">
+    </div>
+    <div class="fgrp">
+      <label class="flbl" for="p-desc">Descripción</label>
+      <input class="finput" id="p-desc" placeholder="ej. Algodón premium, diseño exclusivo">
+    </div>
+    <div class="frow">
+      <div class="fgrp">
+        <label class="flbl" for="p-price">Precio ($)</label>
+        <input class="finput" id="p-price" type="number" step="0.01" placeholder="0.00">
+      </div>
+      <div class="fgrp">
+        <label class="flbl" for="p-cat">Categoría</label>
+        <select class="fsel" id="p-cat">
+          <option value="accesorios">Accesorios</option>
+          <option value="gorros">Gorros</option>
+          <option value="joyeria">Joyería</option>
+          <option value="insumos">Insumos</option>
+        </select>
+      </div>
+    </div>
+    <div class="fgrp">
+      <label class="flbl" for="p-badge">Etiqueta</label>
+      <select class="fsel" id="p-badge">
+        <option value="">Sin etiqueta</option>
+        <option value="new">✦ Nuevo</option>
+        <option value="fav">♡ Favorito</option>
+        <option value="must">⚡ Must have</option>
+      </select>
+    </div>
+    <div class="fgrp">
+      <label class="flbl">Foto del producto</label>
+      <input type="file" accept="image/*" class="hid" id="modal-file">
+      <div class="upzone" onclick="document.getElementById('modal-file').click()" role="button" tabindex="0" aria-label="Subir imagen">
+        <i class="ti ti-photo-up" aria-hidden="true"></i>
+        <span>Subir imagen</span>
+        <div class="prev-wrap" id="prev-wrap">
+          <img id="prev-img" src="" alt="Vista previa">
+        </div>
+      </div>
+    </div>
+
+    <div class="macts">
+      <button class="msec" onclick="closeM('add-modal')">Cancelar</button>
+      <button class="mdanger" id="del-btn" onclick="deleteProduct()">Eliminar</button>
+      <button class="mprimary" onclick="saveProduct()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CHECKOUT MODAL ==================== -->
+<div class="moverlay" id="co-modal" role="dialog" aria-modal="true" aria-label="Finalizar pedido">
+  <div class="modal">
+    <div class="modal-title">🛍 Tu pedido</div>
+    <div id="co-items"></div>
+    <div class="co-total-line">
+      <div class="co-total-lbl">Total</div>
+      <div class="co-total-amt" id="co-total">$0.00</div>
+    </div>
+
+    <div style="margin-top:18px">
+      <label class="flbl" style="display:block;margin-bottom:9px">¿Cómo vas a pagar?</label>
+      <div class="payopts">
+        <div class="popt sel" id="opt-t" onclick="selPay('transfer')" role="button" tabindex="0">
+          <i class="ti ti-transfer" aria-hidden="true"></i>
+          <span>Transferencia</span>
+        </div>
+        <div class="popt" id="opt-c" onclick="selPay('cash')" role="button" tabindex="0">
+          <i class="ti ti-cash" aria-hidden="true"></i>
+          <span>Efectivo</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="fgrp">
+      <label class="flbl" for="b-name">Tu nombre</label>
+      <input class="finput" id="b-name" placeholder="¿Cómo te llamas?">
+    </div>
+    <div class="fgrp" id="addr-f">
+      <label class="flbl" for="b-addr">Dirección de envío</label>
+      <input class="finput" id="b-addr" placeholder="Ciudad, barrio, referencia">
+    </div>
+
+    <button class="wabtn" onclick="sendWA()">
+      <i class="ti ti-brand-whatsapp" aria-hidden="true"></i>
+      Enviar pedido por WhatsApp
+    </button>
+    <div class="macts" style="margin-top:8px">
+      <button class="msec" style="width:100%" onclick="closeM('co-modal')">Seguir viendo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file input for card photo upload -->
+<input type="file" accept="image/*" class="hid" id="card-file">
+
+<!-- Toast notification -->
+<div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
