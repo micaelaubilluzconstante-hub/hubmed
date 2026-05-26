@@ -9,7 +9,7 @@ const CLD_PRESET    = 'hubmed_upload';
 const WA_NUMBER     = '593987045251';
 const ADMIN_HASH    = '7f4a2b9c8e1d6f3a5b0c2e8d4f7a1b9c3e5d7f2a4b6c8e0d2f4a6b8c0e2d4f6'; // hash de Micaela200175
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CAT_COLOR = { accesorios:'#2176AE', gorros:'#7B2D42', joyeria:'#C8941A', insumos:'#1A7A50' };
 const CAT_ICON  = { accesorios:'ti-badge', gorros:'ti-hat', joyeria:'ti-diamond', insumos:'ti-stethoscope' };
@@ -153,7 +153,7 @@ function toast(msg) {
 
 // ── Cargar productos ──
 async function loadProducts() {
-  const { data, error } = await supabase
+  const { data, error } = await sbClient
     .from('productos').select('*').order('created_at', { ascending: true });
   if (error) { console.error(error); return []; }
   if (!data || data.length === 0) { await seedProducts(); return loadProducts(); }
@@ -161,7 +161,7 @@ async function loadProducts() {
 }
 
 async function seedProducts() {
-  const { error } = await supabase.from('productos').insert(SEED);
+  const { error } = await sbClient.from('productos').insert(SEED);
   if (error) console.error('Seed error:', error);
 }
 
@@ -373,11 +373,11 @@ async function saveProduct() {
   };
 
   if (editId) {
-    const { error } = await supabase.from('productos').update(payload).eq('id', editId);
+    const { error } = await sbClient.from('productos').update(payload).eq('id', editId);
     if (error) { toast('Error al actualizar'); console.error(error); }
     else toast(`${name} actualizado ✓`);
   } else {
-    const { error } = await supabase.from('productos').insert(payload);
+    const { error } = await sbClient.from('productos').insert(payload);
     if (error) { toast('Error al guardar'); console.error(error); }
     else toast(`${name} agregado ✓`);
   }
@@ -391,7 +391,7 @@ async function saveProduct() {
 async function deleteProduct() {
   if (!isAdmin) return;
   const name = products.find(p => p.id === editId)?.name || 'Producto';
-  const { error } = await supabase.from('productos').delete().eq('id', editId);
+  const { error } = await sbClient.from('productos').delete().eq('id', editId);
   if (error) { toast('Error al eliminar'); return; }
   cart = cart.filter(c => c.id !== editId);
   updateCartUI(); closeM('add-modal');
@@ -410,7 +410,7 @@ document.getElementById('card-file').addEventListener('change', async function (
   toast('Subiendo foto...');
   try {
     const url = await uploadToCloudinary(file, () => {});
-    const { error } = await supabase.from('productos').update({ img_url: url }).eq('id', cardUploadId);
+    const { error } = await sbClient.from('productos').update({ img_url: url }).eq('id', cardUploadId);
     if (error) throw error;
     products = await loadProducts(); render(); toast('Foto actualizada ✓');
   } catch { toast('Error subiendo la foto'); }
