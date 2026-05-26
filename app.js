@@ -3,7 +3,7 @@
    ============================================================ */
 
 const SUPABASE_URL  = 'https://aqakwecvpkyobscdesxk.supabase.co';
-const SUPABASE_KEY  = 'sb_publishable_OmmUeLXZHA16UZBIHVm8PA_-Okp72Xe';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxYWt3ZWN2cGt5b2JzY2Rlc3hrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTQ3MTMsImV4cCI6MjA5NTM5MDcxM30.7eNbxk9PK2lhxbrDc7ZHVdU5M9MdyXRddqAKhoa8ryM';
 const CLD_CLOUD     = 'dbpetmdmb';
 const CLD_PRESET    = 'hubmed_upload';
 const WA_NUMBER     = '593987045251';
