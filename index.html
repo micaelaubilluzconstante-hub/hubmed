@@ -125,14 +125,14 @@
       </select>
     </div>
     <div class="fgrp">
-      <label class="flbl">Foto del producto</label>
-      <input type="file" accept="image/*" class="hid" id="modal-file">
-      <div class="upzone" onclick="document.getElementById('modal-file').click()">
-        <i class="ti ti-photo-up"></i>
-        <span id="upzone-text">Subir imagen</span>
-        <div class="prev-wrap" id="prev-wrap">
-          <img id="prev-img" src="" alt="Vista previa">
-        </div>
+      <label class="flbl">Fotos del producto <span class="flbl-note">(máx. 5)</span></label>
+      <input type="file" accept="image/*" class="hid" id="slot-file">
+      <div class="multi-slots" id="multi-slots">
+        <div class="img-slot empty" id="slot-0" onclick="trigSlotUpload(0)"><i class="ti ti-plus"></i></div>
+        <div class="img-slot empty" id="slot-1" onclick="trigSlotUpload(1)"><i class="ti ti-plus"></i></div>
+        <div class="img-slot empty" id="slot-2" onclick="trigSlotUpload(2)"><i class="ti ti-plus"></i></div>
+        <div class="img-slot empty" id="slot-3" onclick="trigSlotUpload(3)"><i class="ti ti-plus"></i></div>
+        <div class="img-slot empty" id="slot-4" onclick="trigSlotUpload(4)"><i class="ti ti-plus"></i></div>
       </div>
       <div class="upload-progress" id="upload-progress">
         <div class="upload-bar-wrap"><div class="upload-bar" id="upload-bar"></div></div>
@@ -178,7 +178,7 @@
   </div>
 </div>
 
-<input type="file" accept="image/*" class="hid" id="card-file">
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

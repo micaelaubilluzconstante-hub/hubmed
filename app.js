@@ -7,7 +7,6 @@ const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const CLD_CLOUD     = 'dbpetmdmb';
 const CLD_PRESET    = 'hubmed_upload';
 const WA_NUMBER     = '593987045251';
-const ADMIN_HASH    = '7f4a2b9c8e1d6f3a5b0c2e8d4f7a1b9c3e5d7f2a4b6c8e0d2f4a6b8c0e2d4f6'; // hash de Micaela200175
 
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -20,7 +19,7 @@ const SEED = [
   { name:'Llavero metálico',            desc:'Diseño médico, resistente y cool',                 price:7,    cat:'accesorios', badge:'fav'  },
   { name:'Esferos de goma',             desc:'Grip suave, escritura fluida',                     price:2,    cat:'accesorios', badge:null   },
   { name:'Esferos de huesos',           desc:'Edición especial medicina',                        price:1.5,  cat:'accesorios', badge:'new'  },
-  { name:'Porta credenciales "Café"',   desc:'Diseño exclusivo café, identifícate con estilo',   price:7,    cat:'accesorios', badge:'fav'  },
+  { name:'Porta credenciales Café',     desc:'Diseño exclusivo café, identifícate con estilo',   price:7,    cat:'accesorios', badge:'fav'  },
   { name:'Porta credenciales solo',     desc:'Diseño clásico, funcional y elegante',             price:7,    cat:'accesorios', badge:null   },
   { name:'Aretes medicina/enfermería',  desc:'Símbolo médico, perfectos para el día a día',      price:2,    cat:'joyeria',    badge:'new'  },
   { name:'Broches de corazón',          desc:'Pequeño detalle, gran statement',                  price:5,    cat:'joyeria',    badge:null   },
@@ -71,24 +70,23 @@ let products     = [];
 let cart         = [];
 let curFilter    = 'all';
 let editId       = null;
-let cardUploadId = null;
 let payMode      = 'transfer';
-let pendingFile  = null;
 let isAdmin      = false;
+// Multi-foto: cada slot es null | string(url existente) | File(nuevo)
+let pendingSlots = [null, null, null, null, null];
+let curSlotIdx   = null;
 
-// ── Hash simple para la contraseña ──
+// ── Hash contraseña ──
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password + '_hubmed_salt_2024');
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // ── Sesión admin ──
 function checkAdminSession() {
-  const session = sessionStorage.getItem('hubmed_admin');
-  if (session === 'true') {
+  if (sessionStorage.getItem('hubmed_admin') === 'true') {
     isAdmin = true;
     updateAdminUI();
   }
@@ -109,17 +107,14 @@ function updateAdminUI() {
   render();
 }
 
-// ── Login admin ──
 async function handleAdminBtn() {
   if (isAdmin) {
-    // Cerrar sesión
     isAdmin = false;
     sessionStorage.removeItem('hubmed_admin');
     updateAdminUI();
     toast('Sesión cerrada');
     return;
   }
-  // Abrir modal de login
   document.getElementById('login-modal').classList.add('open');
   setTimeout(() => document.getElementById('admin-password').focus(), 100);
 }
@@ -128,8 +123,8 @@ async function submitLogin() {
   const pwd = document.getElementById('admin-password').value;
   if (!pwd) return;
   const hash = await hashPassword(pwd);
-  const storedHash = await hashPassword('Micaela200175');
-  if (hash === storedHash) {
+  const stored = await hashPassword('Micaela200175');
+  if (hash === stored) {
     isAdmin = true;
     sessionStorage.setItem('hubmed_admin', 'true');
     closeM('login-modal');
@@ -154,8 +149,8 @@ function toast(msg) {
 // ── Cargar productos ──
 async function loadProducts() {
   const { data, error } = await sbClient
-    .from('productos').select('*').order('created_at', { ascending: true });
-  if (error) { console.error(error); return []; }
+    .from('productos').select('*').order('name', { ascending: true });
+  if (error) { console.error('Supabase error:', error); return []; }
   if (!data || data.length === 0) { await seedProducts(); return loadProducts(); }
   return data;
 }
@@ -168,7 +163,14 @@ async function seedProducts() {
 async function init() {
   checkAdminSession();
   document.getElementById('loading-state').style.display = 'flex';
-  products = await loadProducts();
+  try {
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    products = await Promise.race([loadProducts(), timeout]);
+  } catch (err) {
+    console.error('Error init:', err);
+    products = SEED.map((p, i) => ({ ...p, id: `local-${i}`, img_urls: null }));
+    toast('⚠ Sin conexión — datos locales');
+  }
   document.getElementById('loading-state').style.display = 'none';
   render();
 }
@@ -186,6 +188,12 @@ document.querySelectorAll('.fbtn').forEach(btn => {
 });
 
 // ── Render ──
+function getImages(p) {
+  if (p.img_urls && Array.isArray(p.img_urls) && p.img_urls.length > 0) return p.img_urls;
+  if (p.img_url) return [p.img_url];
+  return [];
+}
+
 function render() {
   const grid = document.getElementById('pgrid');
   const list = curFilter === 'all' ? products : products.filter(p => p.cat === curFilter);
@@ -193,37 +201,44 @@ function render() {
   grid.innerHTML = '';
 
   list.forEach(p => {
-    const inCart = cart.find(c => c.id === p.id);
-    const color  = CAT_COLOR[p.cat] || '#2176AE';
-    const icon   = CAT_ICON[p.cat]  || 'ti-box';
-    const label  = CAT_LBL[p.cat]   || p.cat;
-    const badgeHtml = p.badge ? `<div class="cbadge b-${p.badge}">${p.badge==='new'?'Nuevo':p.badge==='fav'?'Fav ♡':'Must have'}</div>` : '';
-    const imgHtml = p.img_url
-      ? `<img class="cimgreal" src="${p.img_url}" alt="${p.name}" loading="lazy">`
-      : `<div class="cimgph" style="background:${color}14">
-           <i class="ti ${icon}" style="font-size:44px;color:${color};opacity:0.2"></i>
-           <div class="phtxt">Foto próximamente</div>
-         </div>`;
+    const inCart  = cart.find(c => c.id === p.id);
+    const color   = CAT_COLOR[p.cat] || '#2176AE';
+    const icon    = CAT_ICON[p.cat]  || 'ti-box';
+    const label   = CAT_LBL[p.cat]   || p.cat;
+    const images  = getImages(p);
 
-    // Overlay de subir foto solo para admin
-    const uploadOverlay = isAdmin
-      ? `<div class="uplay" onclick="trigCardUpload('${p.id}')">
-           <i class="ti ti-photo-up"></i><span>Cambiar foto</span>
-         </div>`
+    const badgeHtml = p.badge ? `<div class="cbadge b-${p.badge}">${p.badge==='new'?'Nuevo':p.badge==='fav'?'Fav ♡':'Must have'}</div>` : '';
+
+    let imgInner = '';
+    if (images.length > 0) {
+      imgInner = images.map((url, i) =>
+        `<img class="cimgreal${i===0?' cactive':''}" src="${url}" alt="${p.name}" loading="lazy">`
+      ).join('');
+    } else {
+      imgInner = `<div class="cimgph" style="background:${color}14;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+        <i class="ti ${icon}" style="font-size:44px;color:${color};opacity:0.2"></i>
+        <div class="phtxt">Foto próximamente</div>
+      </div>`;
+    }
+
+    const arrowsHtml = images.length > 1
+      ? `<button class="carrow cprev" onclick="slideCard(event,'${p.id}',-1)"><i class="ti ti-chevron-left"></i></button>
+         <button class="carrow cnext" onclick="slideCard(event,'${p.id}',1)"><i class="ti ti-chevron-right"></i></button>
+         <div class="cdots">${images.map((_,i)=>`<span class="cdot${i===0?' cdon':''}" data-ci="${p.id}" data-idx="${i}"></span>`).join('')}</div>`
       : '';
 
-    // Botón editar solo para admin
     const editBtn = isAdmin
       ? `<button class="editbtn" onclick="openEditModal('${p.id}')"><i class="ti ti-pencil"></i></button>`
       : '';
 
     const card = document.createElement('div');
     card.className = 'pcard';
+    card.dataset.cardid = p.id;
     card.innerHTML = `
       ${badgeHtml}
       <div class="cimgw">
-        ${imgHtml}
-        ${uploadOverlay}
+        ${imgInner}
+        ${arrowsHtml}
       </div>
       <div class="cbody">
         <div class="ccat" style="color:${color}">${label}</div>
@@ -242,7 +257,6 @@ function render() {
     grid.appendChild(card);
   });
 
-  // Plus card solo para admin
   if (isAdmin) {
     const plus = document.createElement('div');
     plus.className = 'plus-card';
@@ -250,6 +264,22 @@ function render() {
     plus.innerHTML = `<i class="ti ti-plus"></i><span>Agregar producto</span>`;
     grid.appendChild(plus);
   }
+}
+
+// ── Carousel ──
+function slideCard(e, id, dir) {
+  e.stopPropagation();
+  const card = document.querySelector(`[data-cardid="${id}"]`);
+  if (!card) return;
+  const imgs = card.querySelectorAll('.cimgreal');
+  const dots = card.querySelectorAll('.cdot');
+  if (imgs.length < 2) return;
+  let cur = [...imgs].findIndex(img => img.classList.contains('cactive'));
+  imgs[cur].classList.remove('cactive');
+  if (dots[cur]) dots[cur].classList.remove('cdon');
+  cur = (cur + dir + imgs.length) % imgs.length;
+  imgs[cur].classList.add('cactive');
+  if (dots[cur]) dots[cur].classList.add('cdon');
 }
 
 // ── Carrito ──
@@ -268,6 +298,63 @@ function updateCartUI() {
   document.getElementById('ct-disp').textContent = `$${total.toFixed(2)}`;
   document.getElementById('co-btn').disabled = cart.length === 0;
 }
+
+// ── Multi-foto slots ──
+function initSlots(existingUrls) {
+  pendingSlots = [null, null, null, null, null];
+  if (existingUrls && existingUrls.length > 0) {
+    existingUrls.forEach((url, i) => { if (i < 5) pendingSlots[i] = url; });
+  }
+  renderSlots();
+}
+
+function renderSlots() {
+  for (let i = 0; i < 5; i++) {
+    const slot = document.getElementById(`slot-${i}`);
+    if (!slot) continue;
+    const val = pendingSlots[i];
+    if (!val) {
+      slot.className = 'img-slot empty';
+      slot.innerHTML = `<i class="ti ti-plus"></i>`;
+      slot.onclick = () => trigSlotUpload(i);
+    } else {
+      const url = val instanceof File ? URL.createObjectURL(val) : val;
+      slot.className = 'img-slot filled';
+      slot.innerHTML = `<img src="${url}" alt="foto ${i+1}">
+        <button class="slot-del" onclick="removeSlot(event,${i})"><i class="ti ti-x"></i></button>
+        <span class="slot-num">${i+1}</span>`;
+      slot.onclick = null;
+    }
+  }
+}
+
+function trigSlotUpload(idx) {
+  curSlotIdx = idx;
+  document.getElementById('slot-file').click();
+}
+
+function removeSlot(e, idx) {
+  e.stopPropagation();
+  pendingSlots[idx] = null;
+  // Compactar hacia la izquierda
+  const filled = pendingSlots.filter(s => s !== null);
+  pendingSlots = [...filled, ...Array(5 - filled.length).fill(null)];
+  renderSlots();
+}
+
+document.getElementById('slot-file').addEventListener('change', function () {
+  const file = this.files[0];
+  if (!file || curSlotIdx === null) return;
+  // Validar que el slot esté vacío (por si acaso)
+  if (pendingSlots[curSlotIdx] !== null) {
+    // Buscar primer slot vacío
+    curSlotIdx = pendingSlots.findIndex(s => s === null);
+    if (curSlotIdx === -1) { toast('Máximo 5 fotos'); this.value = ''; return; }
+  }
+  pendingSlots[curSlotIdx] = file;
+  renderSlots();
+  this.value = '';
+});
 
 // ── Upload Cloudinary ──
 async function uploadToCloudinary(file, onProgress) {
@@ -293,17 +380,16 @@ async function uploadToCloudinary(file, onProgress) {
 // ── Modales admin ──
 function openAddModal() {
   if (!isAdmin) return;
-  editId = null; pendingFile = null;
+  editId = null;
   document.getElementById('modal-title-text').textContent = '✦ Agregar producto';
   document.getElementById('p-name').value  = '';
   document.getElementById('p-desc').value  = '';
   document.getElementById('p-price').value = '';
   document.getElementById('p-cat').value   = 'accesorios';
   document.getElementById('p-badge').value = '';
-  document.getElementById('prev-wrap').style.display = 'none';
-  document.getElementById('prev-img').src  = '';
   document.getElementById('del-btn').style.display = 'none';
   document.getElementById('upload-progress').style.display = 'none';
+  initSlots([]);
   document.getElementById('add-modal').classList.add('open');
 }
 
@@ -311,7 +397,7 @@ function openEditModal(id) {
   if (!isAdmin) return;
   const p = products.find(x => x.id === id);
   if (!p) return;
-  editId = id; pendingFile = null;
+  editId = id;
   document.getElementById('modal-title-text').textContent = '✏ Editar producto';
   document.getElementById('p-name').value  = p.name;
   document.getElementById('p-desc').value  = p.desc || '';
@@ -320,25 +406,9 @@ function openEditModal(id) {
   document.getElementById('p-badge').value = p.badge || '';
   document.getElementById('del-btn').style.display = 'inline-block';
   document.getElementById('upload-progress').style.display = 'none';
-  if (p.img_url) {
-    document.getElementById('prev-img').src = p.img_url;
-    document.getElementById('prev-wrap').style.display = 'block';
-  } else {
-    document.getElementById('prev-wrap').style.display = 'none';
-  }
+  initSlots(getImages(p));
   document.getElementById('add-modal').classList.add('open');
 }
-
-document.getElementById('modal-file').addEventListener('change', function () {
-  const file = this.files[0]; if (!file) return;
-  pendingFile = file;
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById('prev-img').src = e.target.result;
-    document.getElementById('prev-wrap').style.display = 'block';
-  };
-  reader.readAsDataURL(file);
-});
 
 async function saveProduct() {
   if (!isAdmin) return;
@@ -349,27 +419,47 @@ async function saveProduct() {
   const saveBtn = document.getElementById('save-btn');
   saveBtn.disabled = true; saveBtn.textContent = 'Guardando...';
 
-  let img_url = editId ? (products.find(p => p.id === editId)?.img_url || null) : null;
+  // Subir fotos nuevas (File objects) y recopilar todas las URLs
+  const finalUrls = [];
+  const filesToUpload = pendingSlots.filter(s => s instanceof File);
+  const totalUploads = filesToUpload.length;
+  let uploadIdx = 0;
 
-  if (pendingFile) {
-    try {
-      document.getElementById('upload-progress').style.display = 'block';
-      document.getElementById('upload-bar').style.width = '0%';
-      document.getElementById('upload-label').textContent = 'Subiendo foto...';
-      img_url = await uploadToCloudinary(pendingFile, pct => {
-        document.getElementById('upload-bar').style.width = pct + '%';
-        document.getElementById('upload-label').textContent = `Subiendo... ${pct}%`;
-      });
-      document.getElementById('upload-label').textContent = '¡Foto subida! ✓';
-    } catch (err) {
-      toast('Error subiendo la foto'); saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; return;
+  if (totalUploads > 0) {
+    document.getElementById('upload-progress').style.display = 'block';
+  }
+
+  for (let i = 0; i < 5; i++) {
+    const slot = pendingSlots[i];
+    if (!slot) continue;
+    if (slot instanceof File) {
+      uploadIdx++;
+      document.getElementById('upload-label').textContent = `Subiendo foto ${uploadIdx} de ${totalUploads}...`;
+      try {
+        const url = await uploadToCloudinary(slot, pct => {
+          document.getElementById('upload-bar').style.width = pct + '%';
+        });
+        finalUrls.push(url);
+      } catch (err) {
+        toast(`Error subiendo foto ${uploadIdx}`);
+        saveBtn.disabled = false; saveBtn.textContent = 'Guardar';
+        return;
+      }
+    } else if (typeof slot === 'string') {
+      finalUrls.push(slot);
     }
   }
 
+  document.getElementById('upload-label').textContent = '¡Fotos listas! ✓';
+
   const payload = {
-    name, desc: document.getElementById('p-desc').value.trim(),
-    price: parseFloat(price), cat: document.getElementById('p-cat').value,
-    badge: document.getElementById('p-badge').value || null, img_url,
+    name,
+    desc:    document.getElementById('p-desc').value.trim(),
+    price:   parseFloat(price),
+    cat:     document.getElementById('p-cat').value,
+    badge:   document.getElementById('p-badge').value || null,
+    img_urls: finalUrls.length > 0 ? finalUrls : null,
+    img_url:  finalUrls[0] || null,
   };
 
   if (editId) {
@@ -398,24 +488,6 @@ async function deleteProduct() {
   products = await loadProducts(); render();
   toast(`${name} eliminado`);
 }
-
-function trigCardUpload(id) {
-  if (!isAdmin) return;
-  cardUploadId = id;
-  document.getElementById('card-file').click();
-}
-
-document.getElementById('card-file').addEventListener('change', async function () {
-  const file = this.files[0]; if (!file || !cardUploadId) return;
-  toast('Subiendo foto...');
-  try {
-    const url = await uploadToCloudinary(file, () => {});
-    const { error } = await sbClient.from('productos').update({ img_url: url }).eq('id', cardUploadId);
-    if (error) throw error;
-    products = await loadProducts(); render(); toast('Foto actualizada ✓');
-  } catch { toast('Error subiendo la foto'); }
-  this.value = '';
-});
 
 // ── Checkout ──
 function openCheckout() {
