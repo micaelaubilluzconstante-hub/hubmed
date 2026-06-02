@@ -75,6 +75,14 @@ let isAdmin      = false;
 // Multi-foto: cada slot es null | string(url existente) | File(nuevo)
 let pendingSlots = [null, null, null, null, null];
 let curSlotIdx   = null;
+let pendingAgotado = false;
+
+// ── Stock / Agotado ──
+// Un producto está agotado si lo marcaste a mano (agotado=true)
+// o si pusiste una cantidad y ya llegó a 0.
+function isSoldOut(p) {
+  return p.agotado === true || (p.stock != null && Number(p.stock) <= 0);
+}
 
 // ── Hash contraseña ──
 async function hashPassword(password) {
@@ -206,8 +214,13 @@ function render() {
     const icon    = CAT_ICON[p.cat]  || 'ti-box';
     const label   = CAT_LBL[p.cat]   || p.cat;
     const images  = getImages(p);
+    const sold    = isSoldOut(p);
 
     const badgeHtml = p.badge ? `<div class="cbadge b-${p.badge}">${p.badge==='new'?'Nuevo':p.badge==='fav'?'Fav ♡':'Must have'}</div>` : '';
+
+    // Aviso "¡Solo quedan X!" cuando hay cantidad baja (1-5) y no está agotado
+    const stockHtml = (!sold && p.stock != null && Number(p.stock) > 0 && Number(p.stock) <= 5)
+      ? `<div class="cstock">¡Solo quedan ${p.stock}!</div>` : '';
 
     let imgInner = '';
     if (images.length > 0) {
@@ -232,7 +245,7 @@ function render() {
       : '';
 
     const card = document.createElement('div');
-    card.className = 'pcard';
+    card.className = 'pcard' + (sold ? ' is-soldout' : '');
     card.dataset.cardid = p.id;
     card.innerHTML = `
       ${badgeHtml}
@@ -244,11 +257,12 @@ function render() {
         <div class="ccat" style="color:${color}">${label}</div>
         <div class="cname">${p.name}</div>
         <div class="cdesc">${p.desc || ''}</div>
+        ${stockHtml}
         <div class="cfoot">
           <div class="cprice">$${parseFloat(p.price).toFixed(2)}<em> USD</em></div>
           <div class="cfoot-btns">
             ${editBtn}
-            <button class="addbtn ${inCart ? 'added' : ''}" onclick="toggleCart('${p.id}')">
+            <button class="addbtn ${inCart ? 'added' : ''} ${sold ? 'soldout-btn' : ''}" onclick="toggleCart('${p.id}')" ${sold ? 'disabled' : ''}>
               <i class="ti ${inCart ? 'ti-check' : 'ti-plus'}"></i>
             </button>
           </div>
@@ -286,6 +300,7 @@ function slideCard(e, id, dir) {
 function toggleCart(id) {
   const p = products.find(x => x.id === id);
   if (!p) return;
+  if (isSoldOut(p)) { toast('Este producto está agotado'); return; }
   const idx = cart.findIndex(c => c.id === id);
   if (idx >= 0) { cart.splice(idx, 1); toast('Quitado del carrito'); }
   else { cart.push({ ...p }); toast(`${p.name} agregado ✓`); }
@@ -387,6 +402,9 @@ function openAddModal() {
   document.getElementById('p-price').value = '';
   document.getElementById('p-cat').value   = 'accesorios';
   document.getElementById('p-badge').value = '';
+  document.getElementById('p-stock').value = '';
+  pendingAgotado = false;
+  updateStockToggle();
   document.getElementById('del-btn').style.display = 'none';
   document.getElementById('upload-progress').style.display = 'none';
   initSlots([]);
@@ -404,6 +422,9 @@ function openEditModal(id) {
   document.getElementById('p-price').value = p.price;
   document.getElementById('p-cat').value   = p.cat;
   document.getElementById('p-badge').value = p.badge || '';
+  document.getElementById('p-stock').value = (p.stock != null ? p.stock : '');
+  pendingAgotado = p.agotado === true;
+  updateStockToggle();
   document.getElementById('del-btn').style.display = 'inline-block';
   document.getElementById('upload-progress').style.display = 'none';
   initSlots(getImages(p));
@@ -452,12 +473,16 @@ async function saveProduct() {
 
   document.getElementById('upload-label').textContent = '¡Fotos listas! ✓';
 
+  const stockVal = document.getElementById('p-stock').value;
+
   const payload = {
     name,
     desc:    document.getElementById('p-desc').value.trim(),
     price:   parseFloat(price),
     cat:     document.getElementById('p-cat').value,
     badge:   document.getElementById('p-badge').value || null,
+    stock:   stockVal === '' ? null : parseInt(stockVal, 10),
+    agotado: pendingAgotado,
     img_urls: finalUrls.length > 0 ? finalUrls : null,
     img_url:  finalUrls[0] || null,
   };
@@ -487,6 +512,24 @@ async function deleteProduct() {
   updateCartUI(); closeM('add-modal');
   products = await loadProducts(); render();
   toast(`${name} eliminado`);
+}
+
+// ── Botón Disponible / Agotado ──
+function toggleAgotado() {
+  pendingAgotado = !pendingAgotado;
+  updateStockToggle();
+}
+
+function updateStockToggle() {
+  const btn = document.getElementById('stock-toggle');
+  if (!btn) return;
+  if (pendingAgotado) {
+    btn.className = 'stock-toggle soldout';
+    btn.innerHTML = '<i class="ti ti-circle-x"></i><span id="stock-toggle-txt">Agotado · tocar para marcar disponible</span>';
+  } else {
+    btn.className = 'stock-toggle available';
+    btn.innerHTML = '<i class="ti ti-circle-check"></i><span id="stock-toggle-txt">Disponible · tocar para marcar agotado</span>';
+  }
 }
 
 // ── Checkout ──

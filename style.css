@@ -196,3 +196,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .upload-bar-wrap { background: var(--cream-dark); border-radius: 100px; height: 4px; overflow: hidden; margin-bottom: 5px; }
 .upload-bar { height: 4px; background: var(--sky-dark); border-radius: 100px; width: 0%; transition: width .3s; }
 #upload-label { font-family: 'Syne', sans-serif; font-size: 10px; color: var(--charcoal-soft); letter-spacing: 1px; }
+
+/* ── Stock / Agotado ──────────────────────────── */
+.stock-toggle{width:100%;padding:11px 14px;border-radius:10px;border:1px solid rgba(26,26,46,0.11);background:var(--cream);font-family:'Syne',sans-serif;font-size:12px;font-weight:600;letter-spacing:.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:.2s}
+.stock-toggle.available{color:var(--sky-dark);border-color:rgba(33,118,174,0.3)}
+.stock-toggle.available:hover{background:var(--sky)}
+.stock-toggle.soldout{color:var(--wine);background:var(--wine-pale);border-color:rgba(123,45,66,0.3)}
+.stock-toggle.soldout:hover{filter:brightness(0.97)}
+
+/* Cartel AGOTADO sobre la foto */
+.pcard.is-soldout .cimgw{filter:grayscale(0.45)}
+.pcard.is-soldout .cimgw::after{content:"AGOTADO";position:absolute;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:19px;letter-spacing:3px;color:var(--white);background:rgba(26,26,46,0.55);text-shadow:0 2px 8px rgba(0,0,0,0.35);pointer-events:none}
+
+/* Botón de agregar deshabilitado cuando está agotado */
+.addbtn.soldout-btn{opacity:.35;cursor:not-allowed;pointer-events:none}
+
+/* Aviso de pocas unidades */
+.cstock{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--wine);margin-top:3px;letter-spacing:.3px}

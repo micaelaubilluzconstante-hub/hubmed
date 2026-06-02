@@ -115,14 +115,26 @@
         </select>
       </div>
     </div>
+    <div class="frow">
+      <div class="fgrp">
+        <label class="flbl" for="p-badge">Etiqueta</label>
+        <select class="fsel" id="p-badge">
+          <option value="">Sin etiqueta</option>
+          <option value="new">✦ Nuevo</option>
+          <option value="fav">♡ Favorito</option>
+          <option value="must">⚡ Must have</option>
+        </select>
+      </div>
+      <div class="fgrp">
+        <label class="flbl" for="p-stock">Cantidad <span class="flbl-note">(vacío = ∞)</span></label>
+        <input class="finput" id="p-stock" type="number" min="0" step="1" placeholder="Ilimitado">
+      </div>
+    </div>
     <div class="fgrp">
-      <label class="flbl" for="p-badge">Etiqueta</label>
-      <select class="fsel" id="p-badge">
-        <option value="">Sin etiqueta</option>
-        <option value="new">✦ Nuevo</option>
-        <option value="fav">♡ Favorito</option>
-        <option value="must">⚡ Must have</option>
-      </select>
+      <label class="flbl">Disponibilidad</label>
+      <button type="button" class="stock-toggle available" id="stock-toggle" onclick="toggleAgotado()">
+        <i class="ti ti-circle-check"></i><span id="stock-toggle-txt">Disponible · tocar para marcar agotado</span>
+      </button>
     </div>
     <div class="fgrp">
       <label class="flbl">Fotos del producto <span class="flbl-note">(máx. 5)</span></label>
