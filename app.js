@@ -14,6 +14,8 @@ const CAT_COLOR = { accesorios:'#2176AE', gorros:'#7B2D42', joyeria:'#C8941A', i
 const CAT_ICON  = { accesorios:'ti-badge', gorros:'ti-hat', joyeria:'ti-diamond', insumos:'ti-stethoscope' };
 const CAT_LBL   = { accesorios:'Accesorios', gorros:'Gorros', joyeria:'Joyería', insumos:'Insumos' };
 
+const MAX_FLAGS = 5; // máximo de favoritos y de más vendidos
+
 const SEED = [
   { name:'Pad de sutura',               desc:'Práctica de suturas, esencial para el lab',       price:9,    cat:'accesorios', badge:'must' },
   { name:'Llavero metálico',            desc:'Diseño médico, resistente y cool',                 price:7,    cat:'accesorios', badge:'fav'  },
@@ -189,87 +191,169 @@ document.querySelectorAll('.fbtn').forEach(btn => {
     curFilter = btn.dataset.cat;
     document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    const T = { all:'Todos los productos', accesorios:'Accesorios', gorros:'Gorros', joyeria:'Joyería', insumos:'Insumos' };
+    const T = { all:'Todo el catálogo', accesorios:'Accesorios', gorros:'Gorros', joyeria:'Joyería', insumos:'Insumos' };
     document.getElementById('sec-title').textContent = T[curFilter] || curFilter;
     render();
   });
 });
 
-// ── Render ──
+// ── Imágenes ──
 function getImages(p) {
   if (p.img_urls && Array.isArray(p.img_urls) && p.img_urls.length > 0) return p.img_urls;
   if (p.img_url) return [p.img_url];
   return [];
 }
 
+// ── Tarjeta de producto ──
+// key = en qué sección se dibuja (new, fav, best, cat). Sirve para que el
+// carrusel de fotos funcione aunque el mismo producto salga en varias secciones.
+function buildCard(p, key) {
+  const inCart  = cart.find(c => c.id === p.id);
+  const color   = CAT_COLOR[p.cat] || '#2176AE';
+  const icon    = CAT_ICON[p.cat]  || 'ti-box';
+  const label   = CAT_LBL[p.cat]   || p.cat;
+  const images  = getImages(p);
+  const sold    = isSoldOut(p);
+  const cardKey = `${key}-${p.id}`;
+
+  const badgeHtml = p.badge ? `<div class="cbadge b-${p.badge}">${p.badge==='new'?'Nuevo':p.badge==='fav'?'Fav ♡':'Must have'}</div>` : '';
+
+  // Aviso "¡Solo quedan X!" cuando hay cantidad baja (1-5) y no está agotado
+  const stockHtml = (!sold && p.stock != null && Number(p.stock) > 0 && Number(p.stock) <= 5)
+    ? `<div class="cstock">¡Solo quedan ${p.stock}!</div>` : '';
+
+  let imgInner = '';
+  if (images.length > 0) {
+    imgInner = images.map((url, i) =>
+      `<img class="cimgreal${i===0?' cactive':''}" src="${url}" alt="${p.name}" loading="lazy">`
+    ).join('');
+  } else {
+    imgInner = `<div class="cimgph" style="background:${color}14;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+      <i class="ti ${icon}" style="font-size:44px;color:${color};opacity:0.2"></i>
+      <div class="phtxt">Foto próximamente</div>
+    </div>`;
+  }
+
+  const arrowsHtml = images.length > 1
+    ? `<button class="carrow cprev" onclick="slideCard(event,'${cardKey}',-1)"><i class="ti ti-chevron-left"></i></button>
+       <button class="carrow cnext" onclick="slideCard(event,'${cardKey}',1)"><i class="ti ti-chevron-right"></i></button>
+       <div class="cdots">${images.map((_,i)=>`<span class="cdot${i===0?' cdon':''}" data-idx="${i}"></span>`).join('')}</div>`
+    : '';
+
+  const editBtn = isAdmin
+    ? `<button class="editbtn" onclick="openEditModal('${p.id}')"><i class="ti ti-pencil"></i></button>`
+    : '';
+
+  // Corazón (favorito) y estrella (más vendido): solo los ve el admin
+  const flagsHtml = isAdmin
+    ? `<div class="adm-flags">
+         <button class="flagbtn ${p.favorito ? 'fav-on' : ''}" title="Nuestros favoritos" onclick="toggleFlag('${p.id}','favorito')"><i class="ti ti-heart${p.favorito ? '-filled' : ''}"></i></button>
+         <button class="flagbtn ${p.mas_vendido ? 'star-on' : ''}" title="Más vendidos" onclick="toggleFlag('${p.id}','mas_vendido')"><i class="ti ti-star${p.mas_vendido ? '-filled' : ''}"></i></button>
+       </div>`
+    : '';
+
+  const card = document.createElement('div');
+  card.className = 'pcard' + (sold ? ' is-soldout' : '');
+  card.dataset.cardid = cardKey;
+  card.innerHTML = `
+    ${badgeHtml}
+    ${flagsHtml}
+    <div class="cimgw">
+      ${imgInner}
+      ${arrowsHtml}
+    </div>
+    <div class="cbody">
+      <div class="ccat" style="color:${color}">${label}</div>
+      <div class="cname">${p.name}</div>
+      <div class="cdesc">${p.desc || ''}</div>
+      ${stockHtml}
+      <div class="cfoot">
+        <div class="cprice">$${parseFloat(p.price).toFixed(2)}<em> USD</em></div>
+        <div class="cfoot-btns">
+          ${editBtn}
+          <button class="addbtn ${inCart ? 'added' : ''} ${sold ? 'soldout-btn' : ''}" onclick="toggleCart('${p.id}')" ${sold ? 'disabled' : ''}>
+            <i class="ti ${inCart ? 'ti-check' : 'ti-plus'}"></i>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  return card;
+}
+
+function fillGrid(grid, list, key) {
+  list.forEach(p => grid.appendChild(buildCard(p, key)));
+}
+
+// ── Secciones del inicio ──
+// "Lo último añadido": los 8 más recientes. Los productos sin fecha
+// (los que ya existían) quedan al final; entre ellos, los insumos van últimos.
+function getNewest() {
+  const t = p => p.created_at ? new Date(p.created_at).getTime() : 0;
+  return [...products]
+    .sort((a, b) =>
+      (t(b) - t(a)) ||
+      ((b.badge === 'new') - (a.badge === 'new')) ||
+      ((a.cat === 'insumos') - (b.cat === 'insumos')))
+    .slice(0, 8);
+}
+
+function renderHome() {
+  const home = document.getElementById('home-sections');
+  home.innerHTML = '';
+
+  const sections = [
+    { key:'new',  title:'Lo último añadido',  sub:'Recién llegado a HUB MED',
+      list:getNewest() },
+    { key:'fav',  title:'Nuestros favoritos', sub:'Lo que más nos encanta',
+      list:products.filter(p => p.favorito === true),
+      hint:'Toca el ♥ de cualquier producto para ponerlo aquí (máx. 5)' },
+    { key:'best', title:'Más vendidos',       sub:'Los que más se llevan',
+      list:products.filter(p => p.mas_vendido === true),
+      hint:'Toca la ★ de cualquier producto para ponerlo aquí (máx. 5)' },
+  ];
+
+  sections.forEach(s => {
+    // Si está vacía, solo la ve el admin (con una guía); el cliente no la ve
+    if (!s.list.length && !(isAdmin && s.hint)) return;
+
+    const wrap = document.createElement('section');
+    wrap.className = 'home-sec';
+    wrap.innerHTML = `<div class="sec-hdr"><div>
+      <h2 class="sec-title">${s.title}</h2>
+      <p class="sec-cnt">${s.sub}</p></div></div>`;
+
+    const grid = document.createElement('div');
+    grid.className = 'pgrid';
+    if (s.list.length) fillGrid(grid, s.list, s.key);
+    else grid.innerHTML = `<div class="home-empty">${s.hint}</div>`;
+
+    wrap.appendChild(grid);
+    home.appendChild(wrap);
+  });
+}
+
+// ── Render principal ──
 function render() {
+  const home = document.getElementById('home-sections');
   const grid = document.getElementById('pgrid');
-  const list = curFilter === 'all' ? products : products.filter(p => p.cat === curFilter);
+
+  // Las secciones del inicio solo salen en la pestaña "Todo"
+  if (curFilter === 'all') {
+    home.style.display = 'block';
+    renderHome();
+  } else {
+    home.style.display = 'none';
+    home.innerHTML = '';
+  }
+
+  // Catálogo completo (en "Todo", los insumos van al final)
+  let list = curFilter === 'all'
+    ? [...products].sort((a, b) => (a.cat === 'insumos') - (b.cat === 'insumos'))
+    : products.filter(p => p.cat === curFilter);
+
   document.getElementById('sec-cnt').textContent = list.length ? `${list.length} producto${list.length !== 1 ? 's' : ''}` : '';
   grid.innerHTML = '';
-
-  list.forEach(p => {
-    const inCart  = cart.find(c => c.id === p.id);
-    const color   = CAT_COLOR[p.cat] || '#2176AE';
-    const icon    = CAT_ICON[p.cat]  || 'ti-box';
-    const label   = CAT_LBL[p.cat]   || p.cat;
-    const images  = getImages(p);
-    const sold    = isSoldOut(p);
-
-    const badgeHtml = p.badge ? `<div class="cbadge b-${p.badge}">${p.badge==='new'?'Nuevo':p.badge==='fav'?'Fav ♡':'Must have'}</div>` : '';
-
-    // Aviso "¡Solo quedan X!" cuando hay cantidad baja (1-5) y no está agotado
-    const stockHtml = (!sold && p.stock != null && Number(p.stock) > 0 && Number(p.stock) <= 5)
-      ? `<div class="cstock">¡Solo quedan ${p.stock}!</div>` : '';
-
-    let imgInner = '';
-    if (images.length > 0) {
-      imgInner = images.map((url, i) =>
-        `<img class="cimgreal${i===0?' cactive':''}" src="${url}" alt="${p.name}" loading="lazy">`
-      ).join('');
-    } else {
-      imgInner = `<div class="cimgph" style="background:${color}14;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
-        <i class="ti ${icon}" style="font-size:44px;color:${color};opacity:0.2"></i>
-        <div class="phtxt">Foto próximamente</div>
-      </div>`;
-    }
-
-    const arrowsHtml = images.length > 1
-      ? `<button class="carrow cprev" onclick="slideCard(event,'${p.id}',-1)"><i class="ti ti-chevron-left"></i></button>
-         <button class="carrow cnext" onclick="slideCard(event,'${p.id}',1)"><i class="ti ti-chevron-right"></i></button>
-         <div class="cdots">${images.map((_,i)=>`<span class="cdot${i===0?' cdon':''}" data-ci="${p.id}" data-idx="${i}"></span>`).join('')}</div>`
-      : '';
-
-    const editBtn = isAdmin
-      ? `<button class="editbtn" onclick="openEditModal('${p.id}')"><i class="ti ti-pencil"></i></button>`
-      : '';
-
-    const card = document.createElement('div');
-    card.className = 'pcard' + (sold ? ' is-soldout' : '');
-    card.dataset.cardid = p.id;
-    card.innerHTML = `
-      ${badgeHtml}
-      <div class="cimgw">
-        ${imgInner}
-        ${arrowsHtml}
-      </div>
-      <div class="cbody">
-        <div class="ccat" style="color:${color}">${label}</div>
-        <div class="cname">${p.name}</div>
-        <div class="cdesc">${p.desc || ''}</div>
-        ${stockHtml}
-        <div class="cfoot">
-          <div class="cprice">$${parseFloat(p.price).toFixed(2)}<em> USD</em></div>
-          <div class="cfoot-btns">
-            ${editBtn}
-            <button class="addbtn ${inCart ? 'added' : ''} ${sold ? 'soldout-btn' : ''}" onclick="toggleCart('${p.id}')" ${sold ? 'disabled' : ''}>
-              <i class="ti ${inCart ? 'ti-check' : 'ti-plus'}"></i>
-            </button>
-          </div>
-        </div>
-      </div>`;
-    grid.appendChild(card);
-  });
+  fillGrid(grid, list, 'cat');
 
   if (isAdmin) {
     const plus = document.createElement('div');
@@ -280,10 +364,36 @@ function render() {
   }
 }
 
+// ── Corazón / estrella (máximo 5 cada uno) ──
+async function toggleFlag(id, campo) {
+  if (!isAdmin) return;
+  const p = products.find(x => String(x.id) === String(id));
+  if (!p) return;
+  if (String(p.id).startsWith('local-')) { toast('Sin conexión, intenta de nuevo'); return; }
+
+  const nuevoValor = !p[campo];
+  const nombre = campo === 'favorito' ? 'favoritos' : 'más vendidos';
+
+  if (nuevoValor && products.filter(x => x[campo] === true).length >= MAX_FLAGS) {
+    toast(`Ya tienes ${MAX_FLAGS} ${nombre}. Quita uno primero`);
+    return;
+  }
+
+  const { error } = await sbClient.from('productos')
+    .update({ [campo]: nuevoValor }).eq('id', p.id);
+  if (error) { toast('No se pudo guardar'); console.error(error); return; }
+
+  p[campo] = nuevoValor;
+  render();
+  toast(nuevoValor
+    ? (campo === 'favorito' ? 'Agregado a favoritos ♥' : 'Agregado a más vendidos ★')
+    : 'Quitado');
+}
+
 // ── Carousel ──
-function slideCard(e, id, dir) {
+function slideCard(e, key, dir) {
   e.stopPropagation();
-  const card = document.querySelector(`[data-cardid="${id}"]`);
+  const card = document.querySelector(`[data-cardid="${key}"]`);
   if (!card) return;
   const imgs = card.querySelectorAll('.cimgreal');
   const dots = card.querySelectorAll('.cdot');
@@ -576,31 +686,3 @@ document.addEventListener('keydown', e => {
 });
 
 init();
-// Lo último añadido
-const nuevos = [...productos]
-  .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
-  .slice(0, 8);
-
-const favoritos = productos.filter(p => p.favorito);
-const masVendidos = productos.filter(p => p.mas_vendido);
-
-// Catálogo completo: insumos al final
-const resto = [...productos].sort((a,b) =>
-  (a.category === 'insumos') - (b.category === 'insumos'));
-
-// Corazón / estrella con límite de 5
-async function toggleFlag(id, campo) {
-  const p = productos.find(x => x.id === id);
-  const nuevoValor = !p[campo];
-  const nombre = campo === 'favorito' ? 'favoritos' : 'más vendidos';
-
-  if (nuevoValor && productos.filter(x => x[campo]).length >= 5) {
-    showToast(`Ya tienes 5 ${nombre}. Quita uno primero`);
-    return;
-  }
-  const { error } = await sbClient.from('productos')
-    .update({ [campo]: nuevoValor }).eq('id', id);
-  if (error) { showToast('No se pudo guardar'); return; }
-  p[campo] = nuevoValor;
-  renderHome();
-}
