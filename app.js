@@ -576,3 +576,31 @@ document.addEventListener('keydown', e => {
 });
 
 init();
+// Lo último añadido
+const nuevos = [...productos]
+  .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+  .slice(0, 8);
+
+const favoritos = productos.filter(p => p.favorito);
+const masVendidos = productos.filter(p => p.mas_vendido);
+
+// Catálogo completo: insumos al final
+const resto = [...productos].sort((a,b) =>
+  (a.category === 'insumos') - (b.category === 'insumos'));
+
+// Corazón / estrella con límite de 5
+async function toggleFlag(id, campo) {
+  const p = productos.find(x => x.id === id);
+  const nuevoValor = !p[campo];
+  const nombre = campo === 'favorito' ? 'favoritos' : 'más vendidos';
+
+  if (nuevoValor && productos.filter(x => x[campo]).length >= 5) {
+    showToast(`Ya tienes 5 ${nombre}. Quita uno primero`);
+    return;
+  }
+  const { error } = await sbClient.from('productos')
+    .update({ [campo]: nuevoValor }).eq('id', id);
+  if (error) { showToast('No se pudo guardar'); return; }
+  p[campo] = nuevoValor;
+  renderHome();
+}
